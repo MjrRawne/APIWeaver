@@ -58,8 +58,12 @@ class SaasToMCP:
                 created_tools = []
                 for endpoint in api_config.endpoints:
                     tool_name = f"{api_config.name}_{endpoint.name}"
-                    await self._create_endpoint_tool(api_config, endpoint, tool_name)
-                    created_tools.append(tool_name)
+                    try:
+                        await self._create_endpoint_tool(api_config, endpoint, tool_name)
+                        created_tools.append(tool_name)
+                    except Exception as e:
+                        await ctx.error(f"Failed to create tool {tool_name}: {str(e)}")
+                        continue
                 
                 await ctx.info(f"Registered API '{api_config.name}' with {len(created_tools)} tools")
                 return f"Successfully registered API '{api_config.name}' with tools: {', '.join(created_tools)}"
@@ -200,149 +204,199 @@ class SaasToMCP:
         
         return client
     
+    def _generate_param_collection_code(self, endpoint: APIEndpoint) -> str:
+        """Generate code to collect parameters explicitly."""
+        lines = []
+        for param in endpoint.params:
+            lines.append(f"    call_params['{param.name}'] = {param.name}")
+        return "\n".join(lines)
+    
     async def _create_endpoint_tool(self, api_config: APIConfig, endpoint: APIEndpoint, tool_name: str):
-        """Create an MCP tool for a specific API endpoint."""
+        """Create an MCP tool for a specific API endpoint using closure approach."""
         
-        # Build parameter schema for the tool
-        tool_params = {}
-        required_params = []
+        # Build parameter signature
+        sig_parts = []
+        param_annotations = {}
         
         for param in endpoint.params:
-            param_schema = {"type": param.type}
-            if param.description:
-                param_schema["description"] = param.description
-            if param.enum:
-                param_schema["enum"] = param.enum
-            if param.default is not None:
-                param_schema["default"] = param.default
-            
-            tool_params[param.name] = param_schema
-            if param.required:
-                required_params.append(param.name)
-        
-        # Create the tool function
-        async def api_tool_function(**kwargs) -> Any:
-            """Dynamic API tool function."""
-            ctx = kwargs.get('ctx')
-            if ctx:
-                kwargs.pop('ctx')
-            
-            # Get HTTP client
-            client = self.http_clients.get(api_config.name)
-            if not client:
-                raise ValueError(f"No HTTP client found for API '{api_config.name}'")
-            
-            # Build request
-            url_path = endpoint.path
-            query_params = {}
-            headers = {}
-            json_body = None
-            
-            # Add endpoint-specific headers
-            if endpoint.headers:
-                headers.update(endpoint.headers)
-            
-            # Process parameters
-            for param in endpoint.params:
-                value = kwargs.get(param.name)
-                if value is None and param.required:
-                    raise ValueError(f"Required parameter '{param.name}' not provided")
-                
-                if value is not None:
-                    if param.location == "path":
-                        # Replace path parameter
-                        url_path = url_path.replace(f"{{{param.name}}}", quote(str(value)))
-                    elif param.location == "query":
-                        query_params[param.name] = value
-                    elif param.location == "header":
-                        headers[param.name] = str(value)
-                    elif param.location == "body":
-                        if json_body is None:
-                            json_body = {}
-                        json_body[param.name] = value
-            
-            # Handle API key in query params
-            if api_config.auth and api_config.auth.type == "api_key" and api_config.auth.api_key_param:
-                query_params[api_config.auth.api_key_param] = api_config.auth.api_key
-            
-            # Make request
-            try:
-                if ctx:
-                    await ctx.info(f"Calling {endpoint.method} {url_path}")
-                
-                response = await client.request(
-                    method=endpoint.method,
-                    url=url_path,
-                    params=query_params if query_params else None,
-                    headers=headers if headers else None,
-                    json=json_body,
-                    timeout=endpoint.timeout
-                )
-                
-                response.raise_for_status()
-                
-                # Parse response
-                if response.headers.get("content-type", "").startswith("application/json"):
-                    return response.json()
-                else:
-                    return response.text
-                    
-            except httpx.HTTPStatusError as e:
-                error_msg = f"HTTP {e.response.status_code}: {e.response.text}"
-                if ctx:
-                    await ctx.error(error_msg)
-                raise ValueError(error_msg)
-            except Exception as e:
-                if ctx:
-                    await ctx.error(f"Request failed: {str(e)}")
-                raise
-        
-        # Set function metadata
-        api_tool_function.__name__ = tool_name
-        api_tool_function.__doc__ = endpoint.description
-        
-        # Add Context parameter to the function signature if needed
-        sig = inspect.signature(api_tool_function)
-        params = list(sig.parameters.values())
-        
-        # Add regular parameters
-        for param_name, param_schema in tool_params.items():
+            # Determine Python type
             param_type = str
-            if param_schema["type"] == "integer":
+            if param.type == "integer":
                 param_type = int
-            elif param_schema["type"] == "number":
+            elif param.type == "number":
                 param_type = float
-            elif param_schema["type"] == "boolean":
+            elif param.type == "boolean":
                 param_type = bool
-            elif param_schema["type"] == "array":
+            elif param.type == "array":
                 param_type = List[Any]
-            elif param_schema["type"] == "object":
+            elif param.type == "object":
                 param_type = Dict[str, Any]
             
-            default = param_schema.get("default", inspect.Parameter.empty)
-            params.append(
-                inspect.Parameter(
-                    param_name,
-                    inspect.Parameter.KEYWORD_ONLY,
-                    default=default,
-                    annotation=param_type
+            # Build parameter with default if not required
+            if param.required:
+                sig_parts.append(param.name)
+            else:
+                default_val = param.default if param.default is not None else None
+                sig_parts.append(f"{param.name}={repr(default_val)}")
+            
+            param_annotations[param.name] = param_type
+        
+        # Add context parameter
+        sig_parts.append("ctx: Optional[Context] = None")
+        param_annotations["ctx"] = Optional[Context]
+        param_annotations["return"] = Any
+        
+        # Create the closure-based tool function
+        def create_tool_function():
+            # Capture the current values
+            api_name = api_config.name
+            endpoint_name = endpoint.name
+            
+            async def api_tool_func(*args, **kwargs):
+                # Map positional args to parameter names
+                param_names = [p.name for p in endpoint.params]
+                call_params = {}
+                
+                # Handle positional arguments
+                for i, arg in enumerate(args):
+                    if i < len(param_names):
+                        call_params[param_names[i]] = arg
+                
+                # Handle keyword arguments
+                ctx = kwargs.pop('ctx', None)
+                call_params.update(kwargs)
+                
+                return await self._execute_api_call(
+                    api_name=api_name,
+                    endpoint_name=endpoint_name,
+                    params=call_params,
+                    ctx=ctx
                 )
+            
+            # Set function metadata
+            api_tool_func.__name__ = tool_name
+            api_tool_func.__doc__ = f"""
+{endpoint.description}
+
+Generated tool for {api_config.name} API endpoint: {endpoint.method} {endpoint.path}
+
+Parameters:
+{self._generate_param_docs(endpoint)}
+"""
+            api_tool_func.__annotations__ = param_annotations
+            
+            return api_tool_func
+        
+        # Create and register the tool
+        tool_function = create_tool_function()
+        self.mcp.add_tool(tool_function)
+    
+    def _generate_param_docs(self, endpoint: APIEndpoint) -> str:
+        """Generate parameter documentation for the tool."""
+        docs = []
+        for param in endpoint.params:
+            required_str = "required" if param.required else "optional"
+            default_str = f" (default: {param.default})" if param.default is not None else ""
+            desc = param.description or ""
+            docs.append(f"- {param.name} ({param.type}, {required_str}){default_str}: {desc}")
+        return "\n".join(docs)
+    
+    async def _execute_api_call(self, api_name: str, endpoint_name: str, params: Dict[str, Any], ctx: Optional[Context] = None) -> Any:
+        """Execute an API call with the given parameters."""
+        
+        # Get API config and endpoint
+        api_config = self.apis.get(api_name)
+        if not api_config:
+            raise ValueError(f"API '{api_name}' not found")
+        
+        endpoint = None
+        for ep in api_config.endpoints:
+            if ep.name == endpoint_name:
+                endpoint = ep
+                break
+        
+        if not endpoint:
+            raise ValueError(f"Endpoint '{endpoint_name}' not found in API '{api_name}'")
+        
+        # Get HTTP client
+        client = self.http_clients.get(api_name)
+        if not client:
+            raise ValueError(f"No HTTP client found for API '{api_name}'")
+        
+        # Build request
+        url_path = endpoint.path
+        query_params = {}
+        headers = {}
+        json_body = None
+        
+        # Add endpoint-specific headers
+        if endpoint.headers:
+            headers.update(endpoint.headers)
+        
+        # Process parameters
+        for param in endpoint.params:
+            value = params.get(param.name)
+            
+            # Use default value if not provided
+            if value is None and param.default is not None:
+                value = param.default
+            
+            # Check required parameters
+            if value is None and param.required:
+                raise ValueError(f"Required parameter '{param.name}' not provided")
+            
+            # Skip None values for optional parameters
+            if value is None:
+                continue
+            
+            if param.location == "path":
+                # Replace path parameter
+                url_path = url_path.replace(f"{{{param.name}}}", quote(str(value)))
+            elif param.location == "query":
+                query_params[param.name] = value
+            elif param.location == "header":
+                headers[param.name] = str(value)
+            elif param.location == "body":
+                if json_body is None:
+                    json_body = {}
+                json_body[param.name] = value
+        
+        # Handle API key in query params
+        if api_config.auth and api_config.auth.type == "api_key" and api_config.auth.api_key_param:
+            query_params[api_config.auth.api_key_param] = api_config.auth.api_key
+        
+        # Make request
+        try:
+            if ctx:
+                await ctx.info(f"Calling {endpoint.method} {url_path}")
+            
+            response = await client.request(
+                method=endpoint.method,
+                url=url_path,
+                params=query_params if query_params else None,
+                headers=headers if headers else None,
+                json=json_body,
+                timeout=endpoint.timeout
             )
-        
-        # Add Context parameter
-        params.append(
-            inspect.Parameter(
-                "ctx",
-                inspect.Parameter.KEYWORD_ONLY,
-                default=None,
-                annotation=Optional[Context]
-            )
-        )
-        
-        api_tool_function.__signature__ = sig.replace(parameters=params)
-        
-        # Register the tool
-        self.mcp.add_tool(api_tool_function)
+            
+            response.raise_for_status()
+            
+            # Parse response
+            content_type = response.headers.get("content-type", "")
+            if content_type.startswith("application/json"):
+                return response.json()
+            else:
+                return response.text
+                
+        except httpx.HTTPStatusError as e:
+            error_msg = f"HTTP {e.response.status_code}: {e.response.text}"
+            if ctx:
+                await ctx.error(error_msg)
+            raise ValueError(error_msg)
+        except Exception as e:
+            if ctx:
+                await ctx.error(f"Request failed: {str(e)}")
+            raise
     
     def run(self, **kwargs):
         """Run the MCP server."""
