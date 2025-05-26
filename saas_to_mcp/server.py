@@ -91,7 +91,18 @@ class SaasToMCP:
                             "name": ep.name,
                             "method": ep.method,
                             "path": ep.path,
-                            "description": ep.description
+                            "description": ep.description,
+                            "parameters": [
+                                {
+                                    "name": param.name,
+                                    "type": param.type,
+                                    "location": param.location,
+                                    "required": param.required,
+                                    "description": param.description,
+                                    "default": param.default
+                                }
+                                for param in ep.params
+                            ]
                         }
                         for ep in api.endpoints
                     ]
@@ -165,6 +176,208 @@ class SaasToMCP:
                 return {
                     "status": "failed",
                     "error": str(e)
+                }
+        
+        @self.mcp.tool()
+        async def call_api(
+            api_name: str,
+            endpoint_name: str,
+            parameters: Dict[str, Any] = None,
+            ctx: Optional[Context] = None
+        ) -> Dict[str, Any]:
+            """
+            Call any registered API endpoint with dynamic parameters.
+            
+            This is a generic tool that allows calling any registered API endpoint
+            without having to use the specific endpoint tools. Useful for ad-hoc
+            API calls or when you want more flexibility.
+            
+            Args:
+                api_name: Name of the registered API to call
+                endpoint_name: Name of the endpoint within the API
+                parameters: Dictionary of parameters to pass to the endpoint
+                ctx: Optional context for logging
+            
+            Returns:
+                API response data and metadata
+            
+            Example:
+                # Call OpenWeatherMap API
+                result = await call_api(
+                    api_name="OpenWeatherMap",
+                    endpoint_name="get_weather",
+                    parameters={"q": "London", "units": "metric"}
+                )
+                
+                # Call GitHub API
+                result = await call_api(
+                    api_name="GitHub",
+                    endpoint_name="get_user",
+                    parameters={"username": "octocat"}
+                )
+            """
+            if parameters is None:
+                parameters = {}
+            
+            # Validate API exists
+            if api_name not in self.apis:
+                available_apis = list(self.apis.keys())
+                error_msg = f"API '{api_name}' not found. Available APIs: {', '.join(available_apis)}"
+                if ctx:
+                    await ctx.error(error_msg)
+                raise ValueError(error_msg)
+            
+            # Find the endpoint
+            api_config = self.apis[api_name]
+            endpoint = None
+            for ep in api_config.endpoints:
+                if ep.name == endpoint_name:
+                    endpoint = ep
+                    break
+            
+            if not endpoint:
+                available_endpoints = [ep.name for ep in api_config.endpoints]
+                error_msg = f"Endpoint '{endpoint_name}' not found in API '{api_name}'. Available endpoints: {', '.join(available_endpoints)}"
+                if ctx:
+                    await ctx.error(error_msg)
+                raise ValueError(error_msg)
+            
+            if ctx:
+                await ctx.info(f"Calling {api_name}.{endpoint_name} with parameters: {parameters}")
+            
+            try:
+                # Call the API using existing method
+                response_data = await self._execute_api_call(
+                    api_name=api_name,
+                    endpoint_name=endpoint_name,
+                    params=parameters,
+                    ctx=ctx
+                )
+                
+                # Return structured response with metadata
+                result = {
+                    "success": True,
+                    "api_name": api_name,
+                    "endpoint_name": endpoint_name,
+                    "endpoint_info": {
+                        "method": endpoint.method,
+                        "path": endpoint.path,
+                        "description": endpoint.description
+                    },
+                    "parameters_used": parameters,
+                    "data": response_data
+                }
+                
+                if ctx:
+                    await ctx.info(f"Successfully called {api_name}.{endpoint_name}")
+                
+                return result
+                
+            except Exception as e:
+                error_result = {
+                    "success": False,
+                    "api_name": api_name,
+                    "endpoint_name": endpoint_name,
+                    "parameters_used": parameters,
+                    "error": str(e),
+                    "error_type": type(e).__name__
+                }
+                
+                if ctx:
+                    await ctx.error(f"Failed to call {api_name}.{endpoint_name}: {str(e)}")
+                
+                return error_result
+        
+        @self.mcp.tool()
+        async def get_api_schema(api_name: str, endpoint_name: str = None, ctx: Optional[Context] = None) -> Dict[str, Any]:
+            """
+            Get the schema/documentation for an API or specific endpoint.
+            
+            This tool helps understand what parameters are available for API calls
+            and their requirements before making actual calls.
+            
+            Args:
+                api_name: Name of the registered API
+                endpoint_name: Optional specific endpoint name. If not provided, returns all endpoints
+                ctx: Optional context for logging
+            
+            Returns:
+                Schema information for the API or endpoint
+            """
+            if api_name not in self.apis:
+                available_apis = list(self.apis.keys())
+                error_msg = f"API '{api_name}' not found. Available APIs: {', '.join(available_apis)}"
+                if ctx:
+                    await ctx.error(error_msg)
+                raise ValueError(error_msg)
+            
+            api_config = self.apis[api_name]
+            
+            if endpoint_name:
+                # Return specific endpoint schema
+                endpoint = None
+                for ep in api_config.endpoints:
+                    if ep.name == endpoint_name:
+                        endpoint = ep
+                        break
+                
+                if not endpoint:
+                    available_endpoints = [ep.name for ep in api_config.endpoints]
+                    error_msg = f"Endpoint '{endpoint_name}' not found in API '{api_name}'. Available endpoints: {', '.join(available_endpoints)}"
+                    if ctx:
+                        await ctx.error(error_msg)
+                    raise ValueError(error_msg)
+                
+                return {
+                    "api_name": api_name,
+                    "endpoint_name": endpoint_name,
+                    "method": endpoint.method,
+                    "path": endpoint.path,
+                    "description": endpoint.description,
+                    "parameters": [
+                        {
+                            "name": param.name,
+                            "type": param.type,
+                            "location": param.location,
+                            "required": param.required,
+                            "description": param.description,
+                            "default": param.default,
+                            "enum": param.enum
+                        }
+                        for param in endpoint.params
+                    ],
+                    "headers": endpoint.headers,
+                    "timeout": endpoint.timeout
+                }
+            else:
+                # Return all endpoints schema
+                return {
+                    "api_name": api_name,
+                    "base_url": api_config.base_url,
+                    "description": api_config.description,
+                    "auth_type": api_config.auth.type if api_config.auth else "none",
+                    "global_headers": api_config.headers,
+                    "endpoints": [
+                        {
+                            "name": ep.name,
+                            "method": ep.method,
+                            "path": ep.path,
+                            "description": ep.description,
+                            "parameters": [
+                                {
+                                    "name": param.name,
+                                    "type": param.type,
+                                    "location": param.location,
+                                    "required": param.required,
+                                    "description": param.description,
+                                    "default": param.default,
+                                    "enum": param.enum
+                                }
+                                for param in ep.params
+                            ]
+                        }
+                        for ep in api_config.endpoints
+                    ]
                 }
     
     async def _create_http_client(self, api_config: APIConfig) -> httpx.AsyncClient:
