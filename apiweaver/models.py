@@ -1,5 +1,5 @@
 """
-Data models for SaasToMCP.
+Data models for APIWeaver.
 """
 
 from typing import Dict, Any, Optional, List

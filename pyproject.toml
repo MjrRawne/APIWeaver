@@ -3,16 +3,16 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "saas-to-mcp"
+name = "apiweaver"
 version = "0.2.0"
-description = "Convert any SaaS API into an MCP server with multiple transport support"
+description = "Convert any web API into an MCP server - the universal API-to-MCP bridge with multiple transport support"
 readme = "README.md"
 requires-python = ">=3.12"
 license = {text = "MIT"}
 authors = [
     {name = "GongRzhe", email = "gongrzhe@gmail.com"},
 ]
-keywords = ["mcp", "api", "saas", "model-context-protocol", "fastmcp", "streamable-http", "sse", "stdio"]
+keywords = ["mcp", "api", "apiweaver", "model-context-protocol", "fastmcp", "streamable-http", "sse", "stdio", "web-api", "bridge"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -45,17 +45,17 @@ dev = [
 ]
 
 [project.scripts]
-saas-to-mcp = "saas_to_mcp.cli:main"
+apiweaver = "apiweaver.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/GongRzhe/saas-to-mcp"
-Repository = "https://github.com/GongRzhe/saas-to-mcp"
-Issues = "https://github.com/GongRzhe/saas-to-mcp/issues"
-Documentation = "https://github.com/GongRzhe/saas-to-mcp#readme"
-Changelog = "https://github.com/GongRzhe/saas-to-mcp/releases"
+Homepage = "https://github.com/GongRzhe/APIWeaver"
+Repository = "https://github.com/GongRzhe/APIWeaver"
+Issues = "https://github.com/GongRzhe/APIWeaver/issues"
+Documentation = "https://github.com/GongRzhe/APIWeaver#readme"
+Changelog = "https://github.com/GongRzhe/APIWeaver/releases"
 
 [tool.hatch.build.targets.wheel]
-packages = ["saas_to_mcp"]
+packages = ["apiweaver"]
 
 [tool.black]
 line-length = 100

@@ -1,5 +1,5 @@
 """
-Main SaasToMCP server implementation.
+Main APIWeaver server implementation.
 
 This module provides the core server functionality for converting web APIs
 into MCP (Model Context Protocol) tools.
@@ -15,10 +15,10 @@ from fastmcp import FastMCP, Context
 from .models import APIConfig, APIEndpoint, AuthConfig, RequestParam
 
 
-class SaasToMCP:
+class APIWeaver:
     """Main server that creates MCP tools from API configurations."""
     
-    def __init__(self, name: str = "SaasToMCP"):
+    def __init__(self, name: str = "APIWeaver"):
         self.mcp = FastMCP(name)
         self.apis: Dict[str, APIConfig] = {}
         self.http_clients: Dict[str, httpx.AsyncClient] = {}

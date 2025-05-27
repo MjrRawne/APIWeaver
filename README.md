@@ -1,4 +1,4 @@
-# SaasToMCP
+# APIWeaver
 
 A FastMCP server that dynamically creates MCP (Model Context Protocol) servers from web API configurations. This allows you to easily integrate any REST API, GraphQL endpoint, or web service into an MCP-compatible tool that can be used by AI assistants like Claude.
 
@@ -15,23 +15,23 @@ A FastMCP server that dynamically creates MCP (Model Context Protocol) servers f
 
 ## Transport Types
 
-SaasToMCP supports three different transport types to accommodate various deployment scenarios:
+APIWeaver supports three different transport types to accommodate various deployment scenarios:
 
 ### STDIO Transport (Default)
-- **Usage**: `saas-to-mcp run` or `saas-to-mcp run --transport stdio`
+- **Usage**: `apiweaver run` or `apiweaver run --transport stdio`
 - **Best for**: Local tools, command-line usage, and MCP clients that connect via standard input/output
 - **Characteristics**: Direct process communication, lowest latency, suitable for desktop applications
 - **Endpoint**: N/A (uses stdin/stdout)
 
 ### SSE Transport (Legacy)
-- **Usage**: `saas-to-mcp run --transport sse --host 127.0.0.1 --port 8000`
+- **Usage**: `apiweaver run --transport sse --host 127.0.0.1 --port 8000`
 - **Best for**: Legacy MCP clients that only support Server-Sent Events
 - **Characteristics**: HTTP-based, one-way streaming from server to client
 - **Endpoint**: `http://host:port/mcp`
 - **Note**: This transport is deprecated in favor of Streamable HTTP
 
 ### Streamable HTTP Transport (Recommended)
-- **Usage**: `saas-to-mcp run --transport streamable-http --host 127.0.0.1 --port 8000`
+- **Usage**: `apiweaver run --transport streamable-http --host 127.0.0.1 --port 8000`
 - **Best for**: Modern web deployments, cloud environments, and new MCP clients
 - **Characteristics**: Full HTTP-based communication, bidirectional streaming, better error handling
 - **Endpoint**: `http://host:port/mcp`
@@ -41,7 +41,7 @@ SaasToMCP supports three different transport types to accommodate various deploy
 
 ```bash
 # Clone or download this repository
-cd ~/Desktop/SaasToMCP
+cd ~/Desktop/APIWeaver
 
 # Install dependencies
 pip install -r requirements.txt
@@ -54,16 +54,16 @@ pip install -r requirements.txt
 ```json
 {
   "mcpServers": {
-    "saas-to-mcp": {
+    "apiweaver": {
       "command": "uvx",
-      "args": ["saas-to-mcp", "run"]
+      "args": ["apiweaver", "run"]
     }
   }
 }
 
 ### Starting the Server
 
-There are several ways to run the SaasToMCP server with different transport types:
+There are several ways to run the APIWeaver server with different transport types:
 
 **1. After installation (recommended):**
 
@@ -71,20 +71,20 @@ If you have installed the package (e.g., using `pip install .` from the project 
 
 ```bash
 # Default STDIO transport
-saas-to-mcp run
+apiweaver run
 
 # Streamable HTTP transport (recommended for web deployments)
-saas-to-mcp run --transport streamable-http --host 127.0.0.1 --port 8000
+apiweaver run --transport streamable-http --host 127.0.0.1 --port 8000
 
 # SSE transport (legacy compatibility)
-saas-to-mcp run --transport sse --host 127.0.0.1 --port 8000
+apiweaver run --transport sse --host 127.0.0.1 --port 8000
 ```
 
 **2. Directly from the repository (for development):**
 
 ```bash
 # From the root of the repository
-python -m saas_to_mcp.cli run [OPTIONS]
+python -m apiweaver.cli run [OPTIONS]
 ```
 
 **Transport Options:**
@@ -93,27 +93,27 @@ python -m saas_to_mcp.cli run [OPTIONS]
 - `--port`: Port for HTTP transports (default: 8000)
 - `--path`: URL path for MCP endpoint (default: /mcp)
 
-Run `saas-to-mcp run --help` for all available options.
+Run `apiweaver run --help` for all available options.
 
 ### Using with AI Assistants (like Claude Desktop)
 
-SaasToMCP is designed to expose web APIs as tools for AI assistants that support the Model Context Protocol (MCP). Here's how to use it:
+APIWeaver is designed to expose web APIs as tools for AI assistants that support the Model Context Protocol (MCP). Here's how to use it:
 
-1. **Start the SaasToMCP Server:**
+1. **Start the APIWeaver Server:**
    
    **For modern MCP clients (recommended):**
    ```bash
-   saas-to-mcp run --transport streamable-http --host 127.0.0.1 --port 8000
+   apiweaver run --transport streamable-http --host 127.0.0.1 --port 8000
    ```
    
    **For legacy compatibility:**
    ```bash
-   saas-to-mcp run --transport sse --host 127.0.0.1 --port 8000
+   apiweaver run --transport sse --host 127.0.0.1 --port 8000
    ```
    
    **For local desktop applications:**
    ```bash
-   saas-to-mcp run  # Uses STDIO transport
+   apiweaver run  # Uses STDIO transport
    ```
 
 2. **Configure Your AI Assistant:**
@@ -354,8 +354,8 @@ The server provides these built-in tools:
 ```json
 {
   "mcpServers": {
-    "saas-to-mcp": {
-      "command": "saas-to-mcp",
+    "apiweaver": {
+      "command": "apiweaver",
       "args": ["run", "--transport", "streamable-http", "--host", "127.0.0.1", "--port", "8000"]
     }
   }
@@ -366,8 +366,8 @@ The server provides these built-in tools:
 ```json
 {
   "mcpServers": {
-    "saas-to-mcp": {
-      "command": "saas-to-mcp",
+    "apiweaver": {
+      "command": "apiweaver",
       "args": ["run"]
     }
   }
@@ -405,7 +405,7 @@ The server provides detailed error messages for:
 
 Run with verbose logging (if installed):
 ```bash
-saas-to-mcp run --verbose
+apiweaver run --verbose
 ```
 
 ### Transport-Specific Issues

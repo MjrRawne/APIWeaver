@@ -1,10 +1,10 @@
-# SaaS-to-MCP Server Testing Guide
+# APIWeaver Server Testing Guide
 
-This guide demonstrates how to use the **saas-to-mcp MCP server** to register and test various API endpoints with different authentication methods. We'll use a comprehensive FastAPI demo application as our example.
+This guide demonstrates how to use the **APIWeaver MCP server** to register and test various API endpoints with different authentication methods. We'll use a comprehensive FastAPI demo application as our example.
 
 ## 🎯 Overview
 
-The saas-to-mcp MCP server provides tools to:
+The APIWeaver MCP server provides tools to:
 - **Register APIs** with different authentication methods
 - **Call registered APIs** dynamically
 - **Manage API configurations** and schemas
@@ -495,7 +495,7 @@ unregister_api("FastAPI Demo - System")
 
 ## 📝 Summary
 
-The saas-to-mcp MCP server provides a powerful way to:
+The APIWeaver MCP server provides a powerful way to:
 
 - **Register APIs** with various authentication methods
 - **Test endpoints** dynamically without manual setup
