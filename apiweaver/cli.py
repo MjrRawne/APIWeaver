@@ -38,17 +38,17 @@ def run(name: str, config: Optional[str], transport: str, host: str, port: int, 
             # Register API from config file
             # This would need to be done through the MCP protocol
             # For now, we'll just start the server
-            click.echo(f"Loaded configuration from {config}")
+            # click.echo(f"Loaded configuration from {config}")
     
     # Run server with appropriate transport
     if transport == "stdio":
-        click.echo(f"Starting {name} server on STDIO transport...")
+        # click.echo(f"Starting {name} server on STDIO transport...")
         server.run()
     elif transport == "streamable-http":
-        click.echo(f"Starting {name} server on Streamable HTTP transport at http://{host}:{port}{path}")
+        # click.echo(f"Starting {name} server on Streamable HTTP transport at http://{host}:{port}{path}")
         server.run(transport="streamable-http", host=host, port=port, path=path)
     else:  # sse
-        click.echo(f"Starting {name} server on SSE transport at http://{host}:{port}{path}")
+        # click.echo(f"Starting {name} server on SSE transport at http://{host}:{port}{path}")
         server.run(transport="sse", host=host, port=port, path=path)
 
 
