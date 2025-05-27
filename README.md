@@ -11,6 +11,31 @@ A FastMCP server that dynamically creates MCP (Model Context Protocol) servers f
 - 🔄 **Automatic Tool Generation**: Each API endpoint becomes an MCP tool
 - 🧪 **Built-in Testing**: Test API connections before using them
 - 📊 **Response Handling**: Automatic JSON parsing with fallback to text
+- 🌐 **Multiple Transport Types**: STDIO, SSE, and Streamable HTTP transport support
+
+## Transport Types
+
+SaasToMCP supports three different transport types to accommodate various deployment scenarios:
+
+### STDIO Transport (Default)
+- **Usage**: `saas-to-mcp run` or `saas-to-mcp run --transport stdio`
+- **Best for**: Local tools, command-line usage, and MCP clients that connect via standard input/output
+- **Characteristics**: Direct process communication, lowest latency, suitable for desktop applications
+- **Endpoint**: N/A (uses stdin/stdout)
+
+### SSE Transport (Legacy)
+- **Usage**: `saas-to-mcp run --transport sse --host 127.0.0.1 --port 8000`
+- **Best for**: Legacy MCP clients that only support Server-Sent Events
+- **Characteristics**: HTTP-based, one-way streaming from server to client
+- **Endpoint**: `http://host:port/mcp`
+- **Note**: This transport is deprecated in favor of Streamable HTTP
+
+### Streamable HTTP Transport (Recommended)
+- **Usage**: `saas-to-mcp run --transport streamable-http --host 127.0.0.1 --port 8000`
+- **Best for**: Modern web deployments, cloud environments, and new MCP clients
+- **Characteristics**: Full HTTP-based communication, bidirectional streaming, better error handling
+- **Endpoint**: `http://host:port/mcp`
+- **Recommended**: This is the preferred transport for new deployments
 
 ## Installation
 
@@ -24,52 +49,81 @@ pip install -r requirements.txt
 
 ## Usage
 
+### Claude Desktop
+
+```json
+{
+  "mcpServers": {
+    "saas-to-mcp": {
+      "command": "uvx",
+      "args": ["saas-to-mcp", "run"]
+    }
+  }
+}
+
 ### Starting the Server
 
-There are a couple of ways to run the SaasToMCP server:
+There are several ways to run the SaasToMCP server with different transport types:
 
 **1. After installation (recommended):**
 
-If you have installed the package (e.g., using `pip install .` from the project root after installing requirements), you can use the command-line script:
+If you have installed the package (e.g., using `pip install .` from the project root after installing requirements):
 
 ```bash
-saas-to-mcp run [OPTIONS]
-```
-For example, to start with default settings:
-```bash
+# Default STDIO transport
 saas-to-mcp run
-```
-To start with SSE transport (often useful for web-based tools like Claude Desktop):
-```bash
+
+# Streamable HTTP transport (recommended for web deployments)
+saas-to-mcp run --transport streamable-http --host 127.0.0.1 --port 8000
+
+# SSE transport (legacy compatibility)
 saas-to-mcp run --transport sse --host 127.0.0.1 --port 8000
 ```
 
 **2. Directly from the repository (for development):**
 
-If you are running the code directly from the cloned repository without installing the package:
 ```bash
 # From the root of the repository
 python -m saas_to_mcp.cli run [OPTIONS]
 ```
-Or:
-```bash
-python saas_to_mcp/cli.py run [OPTIONS]
-```
-Refer to `saas-to-mcp run --help` (or `python -m saas_to_mcp.cli run --help`) for available options.
 
-Or use with the MCP CLI:
+**Transport Options:**
+- `--transport`: Choose from `stdio` (default), `sse`, or `streamable-http`
+- `--host`: Host address for HTTP transports (default: 127.0.0.1)
+- `--port`: Port for HTTP transports (default: 8000)
+- `--path`: URL path for MCP endpoint (default: /mcp)
 
-It's generally recommended to run SaasToMCP as a separate server process. However, if your MCP client supports direct installation of local Python scripts or packages as tools:
+Run `saas-to-mcp run --help` for all available options.
 
-- If SaasToMCP is installed in your Python environment, you might be able to register it using its package name (this depends on your MCP client's capabilities):
-  ```bash
-  mcp install saas-to-mcp 
-  ```
-- Or, you might point to the local `cli.py` file (path may need adjustment):
-  ```bash
-  mcp install path/to/your/SaasToMCP/saas_to_mcp/cli.py
-  ```
-Consult your MCP client's documentation for the correct way to add local tools. For most uses with AI assistants, running SaasToMCP as a standalone server (see above) and connecting to its SSE endpoint is the more common approach.
+### Using with AI Assistants (like Claude Desktop)
+
+SaasToMCP is designed to expose web APIs as tools for AI assistants that support the Model Context Protocol (MCP). Here's how to use it:
+
+1. **Start the SaasToMCP Server:**
+   
+   **For modern MCP clients (recommended):**
+   ```bash
+   saas-to-mcp run --transport streamable-http --host 127.0.0.1 --port 8000
+   ```
+   
+   **For legacy compatibility:**
+   ```bash
+   saas-to-mcp run --transport sse --host 127.0.0.1 --port 8000
+   ```
+   
+   **For local desktop applications:**
+   ```bash
+   saas-to-mcp run  # Uses STDIO transport
+   ```
+
+2. **Configure Your AI Assistant:**
+   The MCP endpoint will be available at:
+   - **Streamable HTTP**: `http://127.0.0.1:8000/mcp`
+   - **SSE**: `http://127.0.0.1:8000/mcp`
+   - **STDIO**: Direct process communication
+
+3. **Register APIs and Use Tools:**
+   Once connected, use the built-in `register_api` tool to define web APIs, then use the generated endpoint tools.
 
 ### Core Tools
 
@@ -79,31 +133,8 @@ The server provides these built-in tools:
 2. **list_apis** - List all registered APIs and their endpoints
 3. **unregister_api** - Remove an API and its tools
 4. **test_api_connection** - Test connectivity to a registered API
-
-### Using with AI Assistants (like Claude Desktop)
-
-SaasToMCP is designed to expose web APIs as tools for AI assistants that support the Model Context Protocol (MCP). Here's a general guide to using it with an assistant like Claude Desktop:
-
-1.  **Start the SaasToMCP Server:**
-    It's recommended to run SaasToMCP as a server with Server-Sent Events (SSE) transport, as this is commonly used for web-based AI tools.
-    ```bash
-    # After installing the package
-    saas-to-mcp run --transport sse --host 127.0.0.1 --port 8000
-    ```
-    This will start the server, and by default, the MCP endpoint will be available at `http://127.0.0.1:8000/mcp`. You can customize the host, port, and path using the command-line options.
-
-2.  **Configure Your AI Assistant (Claude Desktop):**
-    *   Open your Claude Desktop application or interface.
-    *   Look for a section related to "Tools," "Plugins," "Custom Tools," or "MCP Servers."
-    *   You'll likely need to add a new MCP tool provider or server by providing the URL of the SaasToMCP endpoint (e.g., `http://127.0.0.1:8000/mcp`).
-    *   **Note:** The exact steps for adding an MCP tool can vary depending on the version and specific interface of your Claude Desktop or other AI assistant. Please consult the documentation for your specific AI assistant for detailed instructions.
-
-3.  **Register APIs and Use Tools:**
-    *   Once Claude Desktop is connected to your SaasToMCP server, you can use the built-in `register_api` tool (usually by instructing the assistant) to define the web APIs you want to access. Provide the JSON configuration for the API you wish to integrate.
-    *   After an API is successfully registered, its endpoints will become available as new tools that the AI assistant can use. For example, if you register an API named `mynews` with an endpoint `get_latest_headlines`, a tool like `mynews_get_latest_headlines` should become available.
-    *   You can then instruct your AI assistant to use these tools (e.g., "Claude, use mynews_get_latest_headlines to find recent tech news").
-
-By following these steps, you can extend the capabilities of your AI assistant by giving it access to a wide range of web services through SaasToMCP.
+5. **call_api** - Generic tool to call any registered API endpoint
+6. **get_api_schema** - Get schema information for APIs and endpoints
 
 ### API Configuration Format
 
@@ -209,113 +240,6 @@ By following these steps, you can extend the capabilities of your AI assistant b
           "location": "path",
           "required": true,
           "description": "GitHub username"
-        }
-      ]
-    },
-    {
-      "name": "create_issue",
-      "description": "Create a new issue in a repository",
-      "method": "POST",
-      "path": "/repos/{owner}/{repo}/issues",
-      "params": [
-        {
-          "name": "owner",
-          "type": "string",
-          "location": "path",
-          "required": true,
-          "description": "Repository owner"
-        },
-        {
-          "name": "repo",
-          "type": "string",
-          "location": "path",
-          "required": true,
-          "description": "Repository name"
-        },
-        {
-          "name": "title",
-          "type": "string",
-          "location": "body",
-          "required": true,
-          "description": "Issue title"
-        },
-        {
-          "name": "body",
-          "type": "string",
-          "location": "body",
-          "required": false,
-          "description": "Issue description"
-        },
-        {
-          "name": "labels",
-          "type": "array",
-          "location": "body",
-          "required": false,
-          "description": "Array of label names"
-        }
-      ]
-    }
-  ]
-}
-```
-
-### Example 3: Stripe API
-
-```json
-{
-  "name": "stripe",
-  "base_url": "https://api.stripe.com/v1",
-  "description": "Stripe Payment API",
-  "auth": {
-    "type": "basic",
-    "username": "sk_test_your_key_here",
-    "password": ""
-  },
-  "endpoints": [
-    {
-      "name": "list_customers",
-      "description": "List all customers",
-      "method": "GET",
-      "path": "/customers",
-      "params": [
-        {
-          "name": "limit",
-          "type": "integer",
-          "location": "query",
-          "required": false,
-          "default": 10
-        },
-        {
-          "name": "starting_after",
-          "type": "string",
-          "location": "query",
-          "required": false,
-          "description": "Cursor for pagination"
-        }
-      ]
-    },
-    {
-      "name": "create_customer",
-      "description": "Create a new customer",
-      "method": "POST",
-      "path": "/customers",
-      "headers": {
-        "Content-Type": "application/x-www-form-urlencoded"
-      },
-      "params": [
-        {
-          "name": "email",
-          "type": "string",
-          "location": "body",
-          "required": true,
-          "description": "Customer email"
-        },
-        {
-          "name": "name",
-          "type": "string",
-          "location": "body",
-          "required": false,
-          "description": "Customer name"
         }
       ]
     }
@@ -424,6 +348,32 @@ By following these steps, you can extend the capabilities of your AI assistant b
 }
 ```
 
+## Claude Desktop Configuration
+
+### For Streamable HTTP Transport (Recommended)
+```json
+{
+  "mcpServers": {
+    "saas-to-mcp": {
+      "command": "saas-to-mcp",
+      "args": ["run", "--transport", "streamable-http", "--host", "127.0.0.1", "--port", "8000"]
+    }
+  }
+}
+```
+
+### For STDIO Transport (Traditional)
+```json
+{
+  "mcpServers": {
+    "saas-to-mcp": {
+      "command": "saas-to-mcp",
+      "args": ["run"]
+    }
+  }
+}
+```
+
 ## Error Handling
 
 The server provides detailed error messages for:
@@ -435,11 +385,12 @@ The server provides detailed error messages for:
 
 ## Tips
 
-1. **Test First**: Always use `test_api_connection` after registering an API
-2. **Start Simple**: Begin with GET endpoints before moving to complex POST requests
-3. **Check Auth**: Ensure your authentication credentials are correct
-4. **Use Descriptions**: Provide clear descriptions for better AI understanding
-5. **Handle Errors**: The server will report HTTP errors with details
+1. **Choose the Right Transport**: Use `streamable-http` for modern deployments, `stdio` for local tools
+2. **Test First**: Always use `test_api_connection` after registering an API
+3. **Start Simple**: Begin with GET endpoints before moving to complex POST requests
+4. **Check Auth**: Ensure your authentication credentials are correct
+5. **Use Descriptions**: Provide clear descriptions for better AI understanding
+6. **Handle Errors**: The server will report HTTP errors with details
 
 ## Troubleshooting
 
@@ -456,10 +407,12 @@ Run with verbose logging (if installed):
 ```bash
 saas-to-mcp run --verbose
 ```
-Or from the repository:
-```bash
-python -m saas_to_mcp.cli run --verbose
-```
+
+### Transport-Specific Issues
+
+- **STDIO**: Ensure the client properly handles stdin/stdout communication
+- **SSE**: Check that the HTTP endpoint is accessible and CORS is configured
+- **Streamable HTTP**: Verify the MCP endpoint responds to HTTP requests
 
 ## Contributing
 

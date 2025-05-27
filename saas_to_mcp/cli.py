@@ -18,10 +18,10 @@ def main():
 @main.command()
 @click.option("--name", default="SaasToMCP", help="Server name")
 @click.option("--config", type=click.Path(exists=True), help="API configuration file (JSON)")
-@click.option("--transport", default="stdio", type=click.Choice(["stdio", "sse"]), help="Transport type")
-@click.option("--host", default="127.0.0.1", help="Host for SSE transport")
-@click.option("--port", default=8000, type=int, help="Port for SSE transport")
-@click.option("--path", default="/mcp", help="Path for SSE transport")
+@click.option("--transport", default="stdio", type=click.Choice(["stdio", "sse", "streamable-http"]), help="Transport type")
+@click.option("--host", default="127.0.0.1", help="Host for HTTP transports")
+@click.option("--port", default=8000, type=int, help="Port for HTTP transports")
+@click.option("--path", default="/mcp", help="Path for HTTP transports")
 def run(name: str, config: Optional[str], transport: str, host: str, port: int, path: str):
     """Run the SaasToMCP server."""
     
@@ -42,9 +42,12 @@ def run(name: str, config: Optional[str], transport: str, host: str, port: int, 
     
     # Run server with appropriate transport
     if transport == "stdio":
-        click.echo(f"Starting {name} server on stdio transport...")
+        click.echo(f"Starting {name} server on STDIO transport...")
         server.run()
-    else:
+    elif transport == "streamable-http":
+        click.echo(f"Starting {name} server on Streamable HTTP transport at http://{host}:{port}{path}")
+        server.run(transport="streamable-http", host=host, port=port, path=path)
+    else:  # sse
         click.echo(f"Starting {name} server on SSE transport at http://{host}:{port}{path}")
         server.run(transport="sse", host=host, port=port, path=path)
 
@@ -180,6 +183,40 @@ def examples():
     
     click.echo("\n3. GitHub API (Bearer Token Auth):")
     click.echo(json.dumps(github_example, indent=2))
+
+
+@main.command()
+def transports():
+    """Show information about available transport types."""
+    
+    click.echo("Available Transport Types:\n")
+    
+    click.echo("1. STDIO (Default)")
+    click.echo("   Usage: saas-to-mcp run")
+    click.echo("   Best for: Local tools, CLI usage")
+    click.echo("   Characteristics: Direct process communication, lowest latency\n")
+    
+    click.echo("2. SSE (Server-Sent Events)")
+    click.echo("   Usage: saas-to-mcp run --transport sse --host 127.0.0.1 --port 8000")
+    click.echo("   Best for: Legacy MCP clients")
+    click.echo("   Characteristics: HTTP-based, one-way streaming")
+    click.echo("   Note: Deprecated in favor of Streamable HTTP\n")
+    
+    click.echo("3. Streamable HTTP (Recommended)")
+    click.echo("   Usage: saas-to-mcp run --transport streamable-http --host 127.0.0.1 --port 8000")
+    click.echo("   Best for: Modern web deployments, cloud environments")
+    click.echo("   Characteristics: Full HTTP communication, bidirectional streaming")
+    click.echo("   Endpoint: http://host:port/mcp\n")
+    
+    click.echo("Examples:")
+    click.echo("  # Local usage")
+    click.echo("  saas-to-mcp run")
+    click.echo("")
+    click.echo("  # Modern HTTP transport")
+    click.echo("  saas-to-mcp run --transport streamable-http --port 8000")
+    click.echo("")
+    click.echo("  # Legacy SSE transport")
+    click.echo("  saas-to-mcp run --transport sse --port 8001")
 
 
 if __name__ == "__main__":
