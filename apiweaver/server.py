@@ -11,6 +11,9 @@ import inspect
 from typing import Dict, Any, Optional, List, Union
 from urllib.parse import urljoin, quote
 import httpx
+import os
+# Set required environment variable for FastMCP 2.8.1+
+os.environ.setdefault('FASTMCP_LOG_LEVEL', 'INFO')
 from fastmcp import FastMCP, Context
 from .models import APIConfig, APIEndpoint, AuthConfig, RequestParam
 

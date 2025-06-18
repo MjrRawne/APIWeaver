@@ -7,6 +7,7 @@ import click
 from pathlib import Path
 from typing import Optional
 from .server import APIWeaver
+import os
 
 
 @click.group()
