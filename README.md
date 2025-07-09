@@ -131,11 +131,12 @@ APIWeaver is designed to expose web APIs as tools for AI assistants that support
 The server provides these built-in tools:
 
 1. **register_api** - Register a new API and create tools for its endpoints
-2. **list_apis** - List all registered APIs and their endpoints
-3. **unregister_api** - Remove an API and its tools
-4. **test_api_connection** - Test connectivity to a registered API
-5. **call_api** - Generic tool to call any registered API endpoint
-6. **get_api_schema** - Get schema information for APIs and endpoints
+2. **register_api_profile** - Register a new API from a file and create tools for its endpoints
+3. **list_apis** - List all registered APIs and their endpoints
+4. **unregister_api** - Remove an API and its tools
+5. **test_api_connection** - Test connectivity to a registered API
+6. **call_api** - Generic tool to call any registered API endpoint
+7. **get_api_schema** - Get schema information for APIs and endpoints
 
 ### API Configuration Format
 

@@ -62,19 +62,70 @@ class APIWeaver:
                 for endpoint in api_config.endpoints:
                     tool_name = f"{api_config.name}_{endpoint.name}"
                     try:
-                        await self._create_endpoint_tool(api_config, endpoint, tool_name)
+                        #await self._create_endpoint_tool(api_config, endpoint, tool_name)
                         created_tools.append(tool_name)
                     except Exception as e:
                         await ctx.error(f"Failed to create tool {tool_name}: {str(e)}")
                         continue
                 
                 await ctx.info(f"Registered API '{api_config.name}' with {len(created_tools)} tools")
-                return f"Successfully registered API '{api_config.name}' with tools: {', '.join(created_tools)}"
+                #return f"Successfully registered API '{api_config.name}' with tools: {', '.join(created_tools)}"
+                return f"Successfully registered API '{api_config.name}' and available via apiweaver:call_api"
                 
             except Exception as e:
                 await ctx.error(f"Failed to register API: {str(e)}")
                 raise
-        
+
+        @self.mcp.tool()
+        async def register_api_profile(config_file_path: str, ctx: Context) -> str:
+            """
+            Register a new API configuration from a file and create MCP tools for its endpoints.
+            
+            Args:
+                config_file_path: file path for the API configuration dictionary containing:
+                    - name: API name
+                    - base_url: Base URL for the API
+                    - description: Optional API description
+                    - auth: Optional authentication configuration
+                    - headers: Optional global headers
+                    - endpoints: List of endpoint configurations
+            
+            Returns:
+                Success message with list of created tools
+            """
+            try:
+                # Store API configuration
+                with open(config_file_path, "r", encoding="utf-8") as f:
+                    config = json.load(f)
+
+                api_config = APIConfig(**config)
+                
+                # Store API configuration
+                self.apis[api_config.name] = api_config
+                
+                # Create HTTP client for this API
+                client = await self._create_http_client(api_config)
+                self.http_clients[api_config.name] = client
+                
+                # Create tools for each endpoint
+                created_tools = []
+                for endpoint in api_config.endpoints:
+                    tool_name = f"{api_config.name}_{endpoint.name}"
+                    try:
+                        #await self._create_endpoint_tool(api_config, endpoint, tool_name)
+                        created_tools.append(tool_name)
+                    except Exception as e:
+                        await ctx.error(f"Failed to create tool {tool_name}: {str(e)}")
+                        continue
+                
+                await ctx.info(f"Registered API '{api_config.name}' with {len(created_tools)} tools")
+                #return f"Successfully registered API '{api_config.name}' with tools: {', '.join(created_tools)}"
+                return f"Successfully registered API '{api_config.name}' and available via apiweaver:call_api"
+                
+            except Exception as e:
+                await ctx.error(f"Failed to register API: {str(e)}")
+                raise
+            
         @self.mcp.tool()
         async def list_apis(ctx: Context) -> Dict[str, Any]:
             """
