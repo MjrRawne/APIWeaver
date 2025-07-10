@@ -384,10 +384,15 @@ class APIWeaver:
                 
                 return {
                     "api_name": api_name,
+                    "description": api_config.description,
+                    "auth_type": api_config.auth.type if api_config.auth else "none",
+                    "global_headers": api_config.headers,
                     "endpoint_name": endpoint_name,
                     "method": endpoint.method,
                     "path": endpoint.path,
                     "description": endpoint.description,
+                    "workflow": endpoint.workflow,
+                    "notes": endpoint.notes,
                     "parameters": [
                         {
                             "name": param.name,
@@ -407,7 +412,7 @@ class APIWeaver:
                 # Return all endpoints schema
                 return {
                     "api_name": api_name,
-                    "base_url": api_config.base_url,
+                    #"base_url": api_config.base_url,
                     "description": api_config.description,
                     "auth_type": api_config.auth.type if api_config.auth else "none",
                     "global_headers": api_config.headers,
@@ -417,6 +422,8 @@ class APIWeaver:
                             "method": ep.method,
                             "path": ep.path,
                             "description": ep.description,
+                            "workflow": ep.workflow,
+                            "notes": ep.notes,
                             "parameters": [
                                 {
                                     "name": param.name,
@@ -627,7 +634,32 @@ Parameters:
                 if json_body is None:
                     json_body = {}
                 json_body[param.name] = value
-        
+
+        # Process parameters
+        for param in endpoint.params_hidden:
+
+            value = param.default
+            
+            # Check required parameters
+            if value is None and param.required:
+                raise ValueError(f"Required parameter '{param.name}' not provided")
+            
+            # Skip None values for optional parameters
+            if value is None:
+                continue
+            
+            if param.location == "path":
+                # Replace path parameter
+                url_path = url_path.replace(f"{{{param.name}}}", quote(str(value)))
+            elif param.location == "query":
+                query_params[param.name] = value
+            elif param.location == "header":
+                headers[param.name] = str(value)
+            elif param.location == "body":
+                if json_body is None:
+                    json_body = {}
+                json_body[param.name] = value
+
         # Handle API key in query params
         if api_config.auth and api_config.auth.type == "api_key" and api_config.auth.api_key_param:
             query_params[api_config.auth.api_key_param] = api_config.auth.api_key
