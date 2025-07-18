@@ -137,7 +137,7 @@ class APIWeaver:
             result = {}
             for name, api in self.apis.items():
                 result[name] = {
-                    "base_url": api.base_url,
+                    #"base_url": api.base_url,
                     "description": api.description,
                     "auth_type": api.auth.type if api.auth else "none",
                     "endpoints": [
@@ -315,8 +315,8 @@ class APIWeaver:
                     "endpoint_name": endpoint_name,
                     "endpoint_info": {
                         "method": endpoint.method,
-                        "path": endpoint.path,
-                        "description": endpoint.description
+                        "path": endpoint.path
+                        #"description": endpoint.description
                     },
                     "parameters_used": parameters,
                     "data": response_data
@@ -386,7 +386,7 @@ class APIWeaver:
                     "api_name": api_name,
                     "description": api_config.description,
                     "auth_type": api_config.auth.type if api_config.auth else "none",
-                    "global_headers": api_config.headers,
+                    #"global_headers": api_config.headers,
                     "endpoint_name": endpoint_name,
                     "method": endpoint.method,
                     "path": endpoint.path,
@@ -415,7 +415,7 @@ class APIWeaver:
                     #"base_url": api_config.base_url,
                     "description": api_config.description,
                     "auth_type": api_config.auth.type if api_config.auth else "none",
-                    "global_headers": api_config.headers,
+                    #"global_headers": api_config.headers,
                     "endpoints": [
                         {
                             "name": ep.name,
@@ -602,7 +602,11 @@ Parameters:
         query_params = {}
         headers = {}
         json_body = None
-        
+
+        # Add api-config headers
+        if api_config.headers:
+            headers.update(api_config.headers)
+
         # Add endpoint-specific headers
         if endpoint.headers:
             headers.update(endpoint.headers)
@@ -667,7 +671,7 @@ Parameters:
         # Make request
         try:
             if ctx:
-                await ctx.info(f"Calling {endpoint.method} {url_path}")
+                await ctx.info(f"Calling {endpoint.method} {url_path} - {json_body}")
             
             response = await client.request(
                 method=endpoint.method,
@@ -682,8 +686,28 @@ Parameters:
             
             # Parse response
             content_type = response.headers.get("content-type", "")
-            if content_type.startswith("application/json"):
-                return response.json()
+            if any(json_type in content_type.lower() for json_type in ["json", "application/json", "text/json"]):
+
+                try:
+                    response_filtered = {}
+                    if endpoint.response_included is not None:
+                        for key, value in response.json().items():
+                            if key in endpoint.response_included:
+                                response_filtered[key] = value
+                        return response_filtered
+                    elif endpoint.response_excluded is not None:
+                        for key, value in response.json().items():
+                            if key not in endpoint.response_excluded:
+                                response_filtered[key] = value
+                        return response_filtered
+                    else:
+                        return response.json()
+                except json.JSONDecodeError:
+                    if ctx:
+                        await ctx.info("Response claims to be JSON but isn't valid JSON")
+                        # Fallback to text
+                        return response.text
+
             else:
                 return response.text
                 

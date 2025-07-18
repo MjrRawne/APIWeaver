@@ -47,6 +47,8 @@ class APIEndpoint(BaseModel):
     params_hidden: Optional[List[RequestParam]] = Field(default_factory=list, description="Request hidden parameters")
     request_body_schema: Optional[Dict[str, Any]] = Field(None, description="JSON Schema for request body")
     response_schema: Optional[Dict[str, Any]] = Field(None, description="JSON Schema for response")
+    response_included: Optional[List[str]] = Field(None, description="Included attribute for response")
+    response_excluded: Optional[List[str]] = Field(None, description="Excluded attribute for response")
     headers: Optional[Dict[str, str]] = Field(None, description="Additional headers for this endpoint")
     timeout: Optional[float] = Field(30.0, description="Request timeout in seconds")
 
