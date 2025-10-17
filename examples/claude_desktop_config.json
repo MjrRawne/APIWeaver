@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "apiweaver": {
+      "command": "cmd",
+      "args": [
+	    "/c",
+	    "apiweaver",
+	    "run"
+	  ]
+    }
+  }
+}
